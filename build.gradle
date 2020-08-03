@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+}
+
+group 'cn.apisium'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.javassist:javassist:3.27.0-GA'
+}
+
+jar {
+    manifest {
+        attributes("Premain-Class": "cn.apisium.nekoagent.Main")
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
