@@ -13,7 +13,7 @@ import java.nio.file.Files;
 import java.security.ProtectionDomain;
 
 public final class Main {
-    private static boolean disallowSandDuplication, allowEndPlatform, allowObsidianSpikesReset;
+    private static boolean disallowSandDuplication, allowEndPlatform, allowObsidianSpikesReset, stoneCutterNoDamage;
     private static String serverName;
     private final static ClassPool pool = ClassPool.getDefault();
 
@@ -22,6 +22,7 @@ public final class Main {
             if (agentArgs.contains("disallowSandDuplication")) disallowSandDuplication = true;
             if (agentArgs.contains("allowEndPlatform")) allowEndPlatform = true;
             if (agentArgs.contains("allowObsidianSpikesReset")) allowObsidianSpikesReset = true;
+            if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
         }
         final File file = new File("server_name.txt");
         if (file.exists()) try {
@@ -30,7 +31,7 @@ public final class Main {
         inst.addTransformer(new Transformer());
     }
 
-    private static String classPrefix;
+    private static String classPrefix, classPrefixDot, obcPrefix;
 
     private static String buildDesc(String returnVal, String ...args) {
         StringBuilder sb = new StringBuilder("(");
@@ -41,6 +42,10 @@ public final class Main {
         }
         return sb.append(')').append(returnVal == null ? 'V' : returnVal).toString();
     }
+    @SuppressWarnings("SameParameterValue")
+    private static String replaceClassName(final String method) {
+        return method.replace("%", classPrefixDot).replace("#", obcPrefix);
+    }
 
     private static final class Transformer implements ClassFileTransformer {
         @Override
@@ -48,7 +53,11 @@ public final class Main {
             if (!className.startsWith("net/minecraft/server/")) return null;
             String[] arr = className.split("/");
             if (arr.length != 5) return null;
-            if (classPrefix == null) classPrefix = arr[0] + "/" + arr[1] + "/" + arr[2] + "/" + arr[3] + "/";
+            if (classPrefix == null) {
+                classPrefix = "net/minecraft/server/" + arr[3] + "/";
+                classPrefixDot = "net.minecraft.server." + arr[3] + ".";
+                obcPrefix = "org.bukkit.craftbukkit." + arr[3] + ".";
+            }
             try {
                 final CtClass clazz;
                 switch (arr[arr.length - 1]) {
@@ -98,9 +107,20 @@ public final class Main {
                         clazz = pool.get(className.replace('/', '.'));
                         clazz.getMethod("getServerModName", "()Ljava/lang/String;").setBody("{ return \"" + serverName
                                 .replace("\"", "\\\"") + "\"; }");
-                        Files.write(new File("a.class").toPath(), clazz.toBytecode());
                         System.out.println("[NekoAgent] Class MinecraftServer has been modified!");
                         break;
+                    case "BlockStonecutter": {
+                        if (stoneCutterNoDamage) return null;
+                        pool.insertClassPath(new LoaderClassPath(loader));
+                        clazz = pool.get(className.replace('/', '.'));
+                        clazz.addMethod(CtNewMethod.make(replaceClassName("public void stepOn(%World world, %BlockPosition blockposition, %Entity entity) {" +
+                                "if (!(entity instanceof %EntityLiving)) return;" +
+                                "#event.CraftEventFactory.blockDamage = world.getWorld().getBlockAt(blockposition.getX(), blockposition.getY(), blockposition.getZ());" +
+                                "entity.damageEntity(%DamageSource.MAGIC, 3.0F);" +
+                                "#event.CraftEventFactory.blockDamage = null;}}"), clazz));
+                        System.out.println("[NekoAgent] Class BlockStonecutter has been modified!");
+                        break;
+                    }
                     default: return null;
                 }
                 return clazz.toBytecode();

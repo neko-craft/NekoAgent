@@ -5,6 +5,7 @@
 - Allow sand duplication.
 - Prevent obsidian spikes reset.
 - Prevent obsidian platform of the_end world generate.
+- Allow StoneCutter to hurt player.
 
 ## Usage
 
