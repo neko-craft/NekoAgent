@@ -94,7 +94,7 @@ public final class Main {
                         if (allowObsidianSpikesReset) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className.replace('/', '.'));
-                        clazz.getMethod("a", buildDesc("Z",
+                        clazz.getMethod("generate", buildDesc("Z",
                                 "GeneratorAccessSeed", "ChunkGenerator", "java/util/Random", "BlockPosition",
                                 "WorldGenFeatureEndSpikeConfiguration")).setBody("{ return true; }");
                         clazz.getMethod("a", buildDesc("Ljava/util/List;",
@@ -116,7 +116,7 @@ public final class Main {
                         clazz.addMethod(CtNewMethod.make(replaceClassName("public void stepOn(%World world, %BlockPosition blockposition, %Entity entity) {" +
                                 "if (!(entity instanceof %EntityLiving)) return;" +
                                 "#event.CraftEventFactory.blockDamage = world.getWorld().getBlockAt(blockposition.getX(), blockposition.getY(), blockposition.getZ());" +
-                                "entity.damageEntity(%DamageSource.MAGIC, 3.0F);" +
+                                "entity.damageEntity(%DamageSource.MAGIC, 4.0F);" +
                                 "#event.CraftEventFactory.blockDamage = null;}}"), clazz));
                         System.out.println("[NekoAgent] Class BlockStonecutter has been modified!");
                         break;
