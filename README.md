@@ -4,7 +4,6 @@
 
 - Allow sand duplication.
 - Prevent obsidian spikes reset.
-- Prevent obsidian platform of the_end world generate.
 - Allow StoneCutter to hurt player.
 
 ## Usage
@@ -18,7 +17,7 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar -jar paper.jar
 ```bash
 java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=disallowSandDuplication -jar paper.jar
 java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=allowObsidianSpikesReset -jar paper.jar
-java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=disallowSandDuplication+allowEndPlatform -jar paper.jar
+java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=disallowSandDuplication+allowObsidianSpikesReset -jar paper.jar
 ```
 
 ## Build

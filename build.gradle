@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.javassist:javassist:3.27.0-GA'
+    implementation 'org.javassist:javassist:3.28.0-GA'
 }
 
 jar {
