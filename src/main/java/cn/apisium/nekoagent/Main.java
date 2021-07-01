@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.security.ProtectionDomain;
 
 public final class Main {
-    private static boolean disallowSandDuplication, allowObsidianSpikesReset, stoneCutterNoDamage;
+    private static boolean disallowSandDuplication, allowObsidianSpikesReset, stoneCutterNoDamage, shulkerNotSpawningInEndCities;
     private static String serverName;
     private final static ClassPool pool = ClassPool.getDefault();
 
@@ -21,6 +21,8 @@ public final class Main {
             if (agentArgs.contains("disallowSandDuplication")) disallowSandDuplication = true;
             if (agentArgs.contains("allowObsidianSpikesReset")) allowObsidianSpikesReset = true;
             if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
+            if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
+            if (agentArgs.contains("shulkerNotSpawningInEndCities")) shulkerNotSpawningInEndCities = true;
         }
         final File file = new File("server_name.txt");
         if (file.exists()) try {
@@ -33,8 +35,10 @@ public final class Main {
 
     private static String buildDesc(@SuppressWarnings("SameParameterValue") String returnVal, String ...args) {
         StringBuilder sb = new StringBuilder("(");
-        for (String name : args) sb.append('L').append(name.replace(".", "/")).append(';');
-        return sb.append(')').append(returnVal == null ? 'V' : returnVal).toString();
+        for (String name : args) if (name.contains(".")) sb.append('L').append(name.replace(".", "/")).append(';');
+        else sb.append(name);
+        return sb.append(')').append(returnVal == null ? 'V' : returnVal.contains(".")
+                ? "L" + returnVal.replace(".", "/") + ";" : returnVal).toString();
     }
 
     private static final class Transformer implements ClassFileTransformer {
@@ -95,6 +99,26 @@ public final class Main {
                             }}""".replace("#", obcPrefix), clazz));
                         break;
                     }
+                    case "net.minecraft.world.level.chunk.ChunkGenerator":
+                        if (shulkerNotSpawningInEndCities) return null;
+                        pool.insertClassPath(new LoaderClassPath(loader));
+                        clazz = pool.get(className);
+                        clazz.addField(CtField.make("""
+                        private static final net.minecraft.util.random.WeightedRandomList shulkers = net.minecraft.util.random.WeightedRandomList
+                            .a((net.minecraft.util.random.WeightedEntry[]) new net.minecraft.world.level.biome.BiomeSettingsMobs.c[] {
+                                new net.minecraft.world.level.biome.BiomeSettingsMobs.c(
+                                    (net.minecraft.world.entity.EntityTypes) net.minecraft.world.entity.EntityTypes
+                                    .a("shulker").get(), 10, 4, 4) });
+                        """, clazz));
+                        clazz.getMethod("getMobsFor", buildDesc(
+                                "net.minecraft.util.random.WeightedRandomList",
+                                "net.minecraft.world.level.biome.BiomeBase",
+                                "net.minecraft.world.level.StructureManager",
+                                "net.minecraft.world.entity.EnumCreatureType",
+                                "net.minecraft.core.BlockPosition")).insertBefore("""
+                                { if ($3 == net.minecraft.world.entity.EnumCreatureType.a && $2.a($4, true,
+                                    net.minecraft.world.level.levelgen.feature.StructureGenerator.o).e()) return $0.shulkers; }""");
+                        break;
                     default: return null;
                 }
                 System.out.println("[NekoAgent] Class " + className + " has been modified!");

@@ -5,6 +5,7 @@
 - Allow sand duplication.
 - Prevent obsidian spikes reset.
 - Allow StoneCutter to hurt player.
+- Allow Shulkers spawn in end cities.
 
 ## Usage
 
