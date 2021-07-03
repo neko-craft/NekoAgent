@@ -2,6 +2,7 @@ package cn.apisium.nekoagent;
 
 import javassist.*;
 import javassist.expr.ExprEditor;
+import javassist.expr.FieldAccess;
 import javassist.expr.MethodCall;
 
 import java.io.File;
@@ -20,7 +21,6 @@ public final class Main {
         if (agentArgs != null) {
             if (agentArgs.contains("disallowSandDuplication")) disallowSandDuplication = true;
             if (agentArgs.contains("allowObsidianSpikesReset")) allowObsidianSpikesReset = true;
-            if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
             if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
             if (agentArgs.contains("shulkerNotSpawningInEndCities")) shulkerNotSpawningInEndCities = true;
         }
@@ -54,34 +54,62 @@ public final class Main {
             try {
                 final CtClass clazz;
                 switch (className) {
+                    case "net.minecraft.world.entity.Entity": {
+                        if (disallowSandDuplication) return null;
+                        pool.insertClassPath(new LoaderClassPath(loader));
+                        clazz = pool.get(className);
+                        clazz.addField(CtField.make("private final boolean isFallingBlock = getClass() ==" +
+                                "net.minecraft.world.entity.item.EntityFallingBlock.class;", clazz));
+                        var editor = new ExprEditor() {
+                            @Override
+                            public void edit(MethodCall m) throws CannotCompileException {
+                                var it = switch (m.getMethodName()) {
+                                    case "isRemoved" -> "!isFallingBlock && $0.isRemoved()";
+                                    case "isAlive" -> "isFallingBlock || $0.isAlive()";
+                                    default -> null;
+                                };
+                                if (it != null) m.replace("$_ = " + it + ";");
+                            }
+
+                            @Override
+                            public void edit(FieldAccess f) throws CannotCompileException {
+                                if (f.getFieldName().equals("valid")) f.replace("$_ = isFallingBlock || $0.valid;");
+                            }
+                        };
+                        clazz.getDeclaredMethod("tickEndPortal").instrument(editor);
+                        clazz.getMethod("teleportTo", buildDesc("net.minecraft.world.entity.Entity",
+                                "net.minecraft.server.level.WorldServer", "net.minecraft.core.BlockPosition")).instrument(editor);
+                        clazz.getDeclaredMethod("callPortalEvent").instrument(editor);
+                        break;
+                    }
                     case "net.minecraft.world.entity.item.EntityFallingBlock": {
                         if (disallowSandDuplication) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
-                        final boolean[] flag = {false};
-                        clazz.getMethod("tick", "()V").instrument(new ExprEditor() {
+                        final int[] flag = {0};
+                        clazz.addMethod(CtNewMethod.make("public boolean canPortal() { return true; }", clazz));
+                        clazz.getDeclaredMethod("tick").instrument(new ExprEditor() {
                             @Override
                             public void edit(MethodCall m) throws CannotCompileException {
                                 if (!m.getMethodName().equals("isRemoved")) return;
                                 m.replace("$_ = false;");
-                                flag[0] = true;
+                                flag[0]++;
                             }
                         });
-                        if (!flag[0]) throw new RuntimeException("Cannot find isRemoved call!");
+                        if (flag[0] != 2) throw new RuntimeException("Cannot find isRemoved call!");
                         break;
                     }
                     case "net.minecraft.world.level.levelgen.feature.WorldGenEnder":
                         if (allowObsidianSpikesReset) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
-                        clazz.getMethod("generate", buildDesc("Z",
-                                "net.minecraft.world.level.levelgen.feature.FeaturePlaceContext")).setBody("{ return true; }");
+                        clazz.getDeclaredMethod("generate").setBody("{ return true; }");
                         break;
                     case "net.minecraft.server.MinecraftServer":
                         if (serverName == null) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
-                        clazz.getMethod("getServerModName", "()Ljava/lang/String;").setBody("{ return \"" + serverName
+                        clazz.getDeclaredMethod("getServerModName").setBody("{ return \"" + serverName
                                 .replace("\"", "\\\"") + "\"; }");
                         break;
                     case "net.minecraft.world.level.block.BlockStonecutter": {
@@ -108,14 +136,9 @@ public final class Main {
                             .a((net.minecraft.util.random.WeightedEntry[]) new net.minecraft.world.level.biome.BiomeSettingsMobs.c[] {
                                 new net.minecraft.world.level.biome.BiomeSettingsMobs.c(
                                     (net.minecraft.world.entity.EntityTypes) net.minecraft.world.entity.EntityTypes
-                                    .a("shulker").get(), 10, 4, 4) });
+                                    .a("shulker").get(), 10, 1, 4) });
                         """, clazz));
-                        clazz.getMethod("getMobsFor", buildDesc(
-                                "net.minecraft.util.random.WeightedRandomList",
-                                "net.minecraft.world.level.biome.BiomeBase",
-                                "net.minecraft.world.level.StructureManager",
-                                "net.minecraft.world.entity.EnumCreatureType",
-                                "net.minecraft.core.BlockPosition")).insertBefore("""
+                        clazz.getDeclaredMethod("getMobsFor").insertBefore("""
                                 { if ($3 == net.minecraft.world.entity.EnumCreatureType.a && $2.a($4, true,
                                     net.minecraft.world.level.levelgen.feature.StructureGenerator.o).e()) return $0.shulkers; }""");
                         break;
