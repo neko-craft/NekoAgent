@@ -13,16 +13,16 @@ import java.nio.file.Files;
 import java.security.ProtectionDomain;
 
 public final class Main {
-    private static boolean disallowSandDuplication, allowObsidianSpikesReset, stoneCutterNoDamage, shulkerNotSpawningInEndCities;
+    private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage, enableShulkerSpawningInEndCities;
     private static String serverName;
     private final static ClassPool pool = ClassPool.getDefault();
 
     public static void premain(final String agentArgs, final Instrumentation inst) {
         if (agentArgs != null) {
-            if (agentArgs.contains("disallowSandDuplication")) disallowSandDuplication = true;
-            if (agentArgs.contains("allowObsidianSpikesReset")) allowObsidianSpikesReset = true;
-            if (agentArgs.contains("stoneCutterNoDamage")) stoneCutterNoDamage = true;
-            if (agentArgs.contains("shulkerNotSpawningInEndCities")) shulkerNotSpawningInEndCities = true;
+            if (agentArgs.contains("enableSandDuplication")) enableSandDuplication = true;
+            if (agentArgs.contains("disableObsidianSpikesReset")) disableObsidianSpikesReset = true;
+            if (agentArgs.contains("enableStoneCutterDamage")) enableStoneCutterDamage = true;
+            if (agentArgs.contains("enableShulkerSpawningInEndCities")) enableShulkerSpawningInEndCities = true;
         }
         final File file = new File("server_name.txt");
         if (file.exists()) try {
@@ -55,7 +55,7 @@ public final class Main {
                 final CtClass clazz;
                 switch (className) {
                     case "net.minecraft.world.entity.Entity": {
-                        if (disallowSandDuplication) return null;
+                        if (!enableSandDuplication) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.addField(CtField.make("private final boolean isFallingBlock = getClass() ==" +
@@ -83,7 +83,7 @@ public final class Main {
                         break;
                     }
                     case "net.minecraft.world.entity.item.EntityFallingBlock": {
-                        if (disallowSandDuplication) return null;
+                        if (!enableSandDuplication) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         final int[] flag = {0};
@@ -100,10 +100,12 @@ public final class Main {
                         break;
                     }
                     case "net.minecraft.world.level.levelgen.feature.WorldGenEnder":
-                        if (allowObsidianSpikesReset) return null;
+                        if (!disableObsidianSpikesReset) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.getDeclaredMethod("generate").setBody("{ return true; }");
+                        clazz.getMethod("a", buildDesc("java.util.List", "net.minecraft.world.level.GeneratorAccessSeed"))
+                            .setBody("{ return java.util.Collections.emptyList(); }");
                         break;
                     case "net.minecraft.server.MinecraftServer":
                         if (serverName == null) return null;
@@ -113,7 +115,7 @@ public final class Main {
                                 .replace("\"", "\\\"") + "\"; }");
                         break;
                     case "net.minecraft.world.level.block.BlockStonecutter": {
-                        if (stoneCutterNoDamage) return null;
+                        if (!enableStoneCutterDamage) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.addMethod(CtNewMethod.make("""
@@ -128,7 +130,7 @@ public final class Main {
                         break;
                     }
                     case "net.minecraft.world.level.chunk.ChunkGenerator":
-                        if (shulkerNotSpawningInEndCities) return null;
+                        if (!enableShulkerSpawningInEndCities) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.addField(CtField.make("""
