@@ -69,10 +69,12 @@ public final class Main {
                     pool.insertClassPath(new LoaderClassPath(loader));
                     CtClass clazz = pool.get(className.replace('/', '.'));
                     clazz.getDeclaredMethod("execute").insertBefore("""
-                    { if ($3.length == 1) { if (!$0.testPermission($1)) return true;
-                        try { net.minecraft.server.MinecraftServer.shouldWaitTickTime = Long.parseLong(args[0]);
-                            $1.sendMessage("[NekoAgent] Set mspt to " + args[0]);
-                            return true; } catch (Throwable e) { return false; } } }""");
+                            { if (!$0.testPermission($1)) return true; if ($3.length == 1) { try {
+                                long v = Long.parseLong(args[0]); if (v < 0 || v > 10000) return false;
+                                net.minecraft.server.MinecraftServer.shouldWaitTickTime = v;
+                                $1.sendMessage("[NekoAgent] Set mspt to " + args[0]);
+                                return true; } catch (Throwable e) { return false; } } else $1.sendMessage(
+                                "[NekoAgent] Current mspt value: " + net.minecraft.server.MinecraftServer.shouldWaitTickTime); }""");
                     System.out.println("[NekoAgent] Class " + className + " has been modified!");
                     return clazz.toBytecode();
                 } catch (Throwable e) {
@@ -145,7 +147,7 @@ public final class Main {
                         if (serverName != null) clazz.getDeclaredMethod("getServerModName")
                                 .setBody("{ return \"" + serverName.replace("\"", "\\\"") + "\"; }");
                         if (enableSetMSPTCommand) {
-                            clazz.addField(CtField.make("public static long shouldWaitTickTime = 25L;", clazz));
+                            clazz.addField(CtField.make("public static long shouldWaitTickTime = 50L;", clazz));
                             clazz.getDeclaredMethod("bh").insertBefore("{ $0.ao += $0.shouldWaitTickTime - 50L; }");
                             clazz.getDeclaredMethod("sleepForTick")
                                     .insertBefore("{ $0.ap = Math.max(net.minecraft.SystemUtils.getMonotonicMillis() +" +
