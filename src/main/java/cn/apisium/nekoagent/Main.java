@@ -13,7 +13,8 @@ import java.nio.file.Files;
 import java.security.ProtectionDomain;
 
 public final class Main {
-    private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage, enableShulkerSpawningInEndCities;
+    private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage,
+            enableShulkerSpawningInEndCities, enableSetMSPTCommand;
     private static String serverName;
     private final static ClassPool pool = ClassPool.getDefault();
 
@@ -22,6 +23,7 @@ public final class Main {
             if (agentArgs.contains("enableSandDuplication")) enableSandDuplication = true;
             if (agentArgs.contains("disableObsidianSpikesReset")) disableObsidianSpikesReset = true;
             if (agentArgs.contains("enableStoneCutterDamage")) enableStoneCutterDamage = true;
+            if (agentArgs.contains("enableSetMSPTCommand")) enableSetMSPTCommand = true;
             if (agentArgs.contains("enableShulkerSpawningInEndCities")) enableShulkerSpawningInEndCities = true;
         }
         final File file = new File("server_name.txt");
@@ -48,6 +50,35 @@ public final class Main {
                 String[] arr = className.split("/");
                 if (arr.length < 4 || !arr[3].startsWith("v")) return null;
                 obcPrefix = "org.bukkit.craftbukkit." + arr[3] + ".";
+            }
+            if (enableSetMSPTCommand) switch (className) {
+                case "org/spigotmc/TicksPerSecondCommand": try {
+                    pool.insertClassPath(new LoaderClassPath(loader));
+                    CtClass clazz = pool.get(className.replace('/', '.'));
+                    clazz.getDeclaredMethod("format").setBody("""
+                    { return ($1 > 21.3D ? org.bukkit.ChatColor.AQUA : $1 > 18.0D ? org.bukkit.ChatColor.GREEN : $1 > 16.0D ?
+                            org.bukkit.ChatColor.YELLOW : org.bukkit.ChatColor.RED).toString() + ($1 > 21.0D ? "*" : "") +
+                            ((double)Math.round($1 * 100.0D) / 100.0D); }""");
+                    System.out.println("[NekoAgent] Class " + className + " has been modified!");
+                    return clazz.toBytecode();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                    return null;
+                }
+                case "com/destroystokyo/paper/MSPTCommand": try {
+                    pool.insertClassPath(new LoaderClassPath(loader));
+                    CtClass clazz = pool.get(className.replace('/', '.'));
+                    clazz.getDeclaredMethod("execute").insertBefore("""
+                    { if ($3.length == 1) { if (!$0.testPermission($1)) return true;
+                        try { net.minecraft.server.MinecraftServer.shouldWaitTickTime = Long.parseLong(args[0]);
+                            $1.sendMessage("[NekoAgent] Set mspt to " + args[0]);
+                            return true; } catch (Throwable e) { return false; } } }""");
+                    System.out.println("[NekoAgent] Class " + className + " has been modified!");
+                    return clazz.toBytecode();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                    return null;
+                }
             }
             if (!className.startsWith("net/minecraft/")) return null;
             className = className.replace('/', '.');
@@ -108,11 +139,18 @@ public final class Main {
                             .setBody("{ return java.util.Collections.emptyList(); }");
                         break;
                     case "net.minecraft.server.MinecraftServer":
-                        if (serverName == null) return null;
+                        if (serverName == null && !enableSetMSPTCommand) return null;
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
-                        clazz.getDeclaredMethod("getServerModName").setBody("{ return \"" + serverName
-                                .replace("\"", "\\\"") + "\"; }");
+                        if (serverName != null) clazz.getDeclaredMethod("getServerModName")
+                                .setBody("{ return \"" + serverName.replace("\"", "\\\"") + "\"; }");
+                        if (enableSetMSPTCommand) {
+                            clazz.addField(CtField.make("public static long shouldWaitTickTime = 25L;", clazz));
+                            clazz.getDeclaredMethod("bh").insertBefore("{ $0.ao += $0.shouldWaitTickTime - 50L; }");
+                            clazz.getDeclaredMethod("sleepForTick")
+                                    .insertBefore("{ $0.ap = Math.max(net.minecraft.SystemUtils.getMonotonicMillis() +" +
+                                            "$0.shouldWaitTickTime, $0.ao); }");
+                        }
                         break;
                     case "net.minecraft.world.level.block.BlockStonecutter": {
                         if (!enableStoneCutterDamage) return null;
@@ -148,7 +186,7 @@ public final class Main {
                 }
                 System.out.println("[NekoAgent] Class " + className + " has been modified!");
                 return clazz.toBytecode();
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 e.printStackTrace();
                 return null;
             }
