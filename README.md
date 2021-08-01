@@ -30,6 +30,8 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=enableStoneCutterDamage+enableShulker
 - enableStoneCutterDamage
 - enableShulkerSpawningInEndCities
 - enableSetMSPTCommand
+- maxShulkersCount=4
+- minShulkersCount=1
 
 ## Build
 

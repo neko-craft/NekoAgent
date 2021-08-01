@@ -11,11 +11,14 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.security.ProtectionDomain;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class Main {
     private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage,
             enableShulkerSpawningInEndCities, enableSetMSPTCommand;
     private static String serverName;
+    private static int maxShulkersCount = 4, minShulkersCount = 1;
     private final static ClassPool pool = ClassPool.getDefault();
 
     public static void premain(final String agentArgs, final Instrumentation inst) {
@@ -25,6 +28,10 @@ public final class Main {
             if (agentArgs.contains("enableStoneCutterDamage")) enableStoneCutterDamage = true;
             if (agentArgs.contains("enableSetMSPTCommand")) enableSetMSPTCommand = true;
             if (agentArgs.contains("enableShulkerSpawningInEndCities")) enableShulkerSpawningInEndCities = true;
+            Matcher matcher = Pattern.compile("maxShulkersCount=(\\d+)").matcher(agentArgs);
+            if (matcher.find()) maxShulkersCount = Integer.parseInt(matcher.group(1));
+            matcher = Pattern.compile("minShulkersCount=(\\d+)").matcher(agentArgs);
+            if (matcher.find()) minShulkersCount = Integer.parseInt(matcher.group(1));
         }
         final File file = new File("server_name.txt");
         if (file.exists()) try {
@@ -45,7 +52,8 @@ public final class Main {
 
     private static final class Transformer implements ClassFileTransformer {
         @Override
-        public byte[] transform(final ClassLoader loader, String className, final Class<?> classBeingRedefined, final ProtectionDomain protectionDomain, final byte[] classfileBuffer) {
+        public byte[] transform(final ClassLoader loader, String className, final Class<?> classBeingRedefined,
+                                final ProtectionDomain protectionDomain, final byte[] classfileBuffer) {
             if (obcPrefix == null && className.startsWith("org/bukkit/craftbukkit/")) {
                 String[] arr = className.split("/");
                 if (arr.length < 4 || !arr[3].startsWith("v")) return null;
@@ -61,10 +69,7 @@ public final class Main {
                             ((double)Math.round($1 * 100.0D) / 100.0D); }""");
                     System.out.println("[NekoAgent] Class " + className + " has been modified!");
                     return clazz.toBytecode();
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                    return null;
-                }
+                } catch (Throwable e) { throw new RuntimeException(e); }
                 case "com/destroystokyo/paper/MSPTCommand": try {
                     pool.insertClassPath(new LoaderClassPath(loader));
                     CtClass clazz = pool.get(className.replace('/', '.'));
@@ -77,18 +82,15 @@ public final class Main {
                                 "[NekoAgent] Current mspt value: " + net.minecraft.server.MinecraftServer.shouldWaitTickTime); }""");
                     System.out.println("[NekoAgent] Class " + className + " has been modified!");
                     return clazz.toBytecode();
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                    return null;
-                }
+                } catch (Throwable e) { throw new RuntimeException(e); }
             }
             if (!className.startsWith("net/minecraft/")) return null;
             className = className.replace('/', '.');
-            try {
-                final CtClass clazz;
-                switch (className) {
-                    case "net.minecraft.world.entity.Entity": {
-                        if (!enableSandDuplication) return null;
+            final CtClass clazz;
+            switch (className) {
+                case "net.minecraft.world.entity.Entity":
+                    if (!enableSandDuplication) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.addField(CtField.make("private final boolean isFallingBlock = getClass() ==" +
@@ -114,9 +116,10 @@ public final class Main {
                                 "net.minecraft.server.level.WorldServer", "net.minecraft.core.BlockPosition")).instrument(editor);
                         clazz.getDeclaredMethod("callPortalEvent").instrument(editor);
                         break;
-                    }
-                    case "net.minecraft.world.entity.item.EntityFallingBlock": {
-                        if (!enableSandDuplication) return null;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.world.entity.item.EntityFallingBlock":
+                    if (!enableSandDuplication) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         final int[] flag = {0};
@@ -131,17 +134,20 @@ public final class Main {
                         });
                         if (flag[0] != 2) throw new RuntimeException("Cannot find isRemoved call!");
                         break;
-                    }
-                    case "net.minecraft.world.level.levelgen.feature.WorldGenEnder":
-                        if (!disableObsidianSpikesReset) return null;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.world.level.levelgen.feature.WorldGenEnder":
+                    if (!disableObsidianSpikesReset) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.getDeclaredMethod("generate").setBody("{ return true; }");
                         clazz.getMethod("a", buildDesc("java.util.List", "net.minecraft.world.level.GeneratorAccessSeed"))
-                            .setBody("{ return java.util.Collections.emptyList(); }");
+                                .setBody("{ return java.util.Collections.emptyList(); }");
                         break;
-                    case "net.minecraft.server.MinecraftServer":
-                        if (serverName == null && !enableSetMSPTCommand) return null;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.server.MinecraftServer":
+                    if (serverName == null && !enableSetMSPTCommand) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         if (serverName != null) clazz.getDeclaredMethod("getServerModName")
@@ -154,44 +160,44 @@ public final class Main {
                                             "$0.shouldWaitTickTime, $0.ao); }");
                         }
                         break;
-                    case "net.minecraft.world.level.block.BlockStonecutter": {
-                        if (!enableStoneCutterDamage) return null;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.world.level.block.BlockStonecutter":
+                    if (!enableStoneCutterDamage) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
                         clazz.addMethod(CtNewMethod.make("""
-                            public void stepOn(net.minecraft.world.level.World world, net.minecraft.core.BlockPosition p,
-                                net.minecraft.world.level.block.state.IBlockData state, net.minecraft.world.entity.Entity entity) {
-                                if (!(entity instanceof net.minecraft.world.entity.EntityLiving) ||
-                                    net.minecraft.world.item.enchantment.EnchantmentManager.i((net.minecraft.world.entity.EntityLiving) entity)) return;
-                                #event.CraftEventFactory.blockDamage = world.getWorld().getBlockAt(p.getX(), p.getY(), p.getZ());
-                                entity.damageEntity(net.minecraft.world.damagesource.DamageSource.o, 4.0F);
-                                #event.CraftEventFactory.blockDamage = null;
-                            }}""".replace("#", obcPrefix), clazz));
+                                public void stepOn(net.minecraft.world.level.World world, net.minecraft.core.BlockPosition p,
+                                    net.minecraft.world.level.block.state.IBlockData state, net.minecraft.world.entity.Entity entity) {
+                                    if (!(entity instanceof net.minecraft.world.entity.EntityLiving) ||
+                                        net.minecraft.world.item.enchantment.EnchantmentManager.i((net.minecraft.world.entity.EntityLiving) entity)) return;
+                                    #event.CraftEventFactory.blockDamage = world.getWorld().getBlockAt(p.getX(), p.getY(), p.getZ());
+                                    entity.damageEntity(net.minecraft.world.damagesource.DamageSource.o, 4.0F);
+                                    #event.CraftEventFactory.blockDamage = null;
+                                }}""".replace("#", obcPrefix), clazz));
                         break;
-                    }
-                    case "net.minecraft.world.level.chunk.ChunkGenerator":
-                        if (!enableShulkerSpawningInEndCities) return null;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.world.level.chunk.ChunkGenerator":
+                    if (!enableShulkerSpawningInEndCities) return null;
+                    try {
                         pool.insertClassPath(new LoaderClassPath(loader));
                         clazz = pool.get(className);
-                        clazz.addField(CtField.make("""
-                        private static final net.minecraft.util.random.WeightedRandomList shulkers = net.minecraft.util.random.WeightedRandomList
-                            .a((net.minecraft.util.random.WeightedEntry[]) new net.minecraft.world.level.biome.BiomeSettingsMobs.c[] {
-                                new net.minecraft.world.level.biome.BiomeSettingsMobs.c(
-                                    (net.minecraft.world.entity.EntityTypes) net.minecraft.world.entity.EntityTypes
-                                    .a("shulker").get(), 10, 1, 4) });
-                        """, clazz));
+                        clazz.addField(CtField.make(String.format("""
+                                private static final net.minecraft.util.random.WeightedRandomList shulkers = net.minecraft.util.random.WeightedRandomList
+                                    .a((net.minecraft.util.random.WeightedEntry[]) new net.minecraft.world.level.biome.BiomeSettingsMobs.c[] {
+                                        new net.minecraft.world.level.biome.BiomeSettingsMobs.c(
+                                            (net.minecraft.world.entity.EntityTypes) net.minecraft.world.entity.EntityTypes
+                                            .a("shulker").get(), 10, %d, %d) });
+                                """, minShulkersCount, maxShulkersCount), clazz));
                         clazz.getDeclaredMethod("getMobsFor").insertBefore("""
                                 { if ($3 == net.minecraft.world.entity.EnumCreatureType.a && $2.a($4, true,
                                     net.minecraft.world.level.levelgen.feature.StructureGenerator.o).e()) return $0.shulkers; }""");
                         break;
-                    default: return null;
-                }
-                System.out.println("[NekoAgent] Class " + className + " has been modified!");
-                return clazz.toBytecode();
-            } catch (Throwable e) {
-                e.printStackTrace();
-                return null;
+                    }  catch (Throwable e) { throw new RuntimeException(e); }
+                default: return null;
             }
+            System.out.println("[NekoAgent] Class " + className + " has been modified!");
+            try { return clazz.toBytecode(); } catch (Throwable e) { throw new RuntimeException(e); }
         }
     }
 }
