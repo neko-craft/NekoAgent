@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 
 public final class Main {
     private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage,
-            enableShulkerSpawningInEndCities, enableSetMSPTCommand;
+            enableShulkerSpawningInEndCities, enableSetMSPTCommand, enableLeashableViallagers;
     private static String serverName;
     private static int maxShulkersCount = 4, minShulkersCount = 1;
     private final static ClassPool pool = ClassPool.getDefault();
@@ -28,6 +28,7 @@ public final class Main {
             if (agentArgs.contains("enableStoneCutterDamage")) enableStoneCutterDamage = true;
             if (agentArgs.contains("enableSetMSPTCommand")) enableSetMSPTCommand = true;
             if (agentArgs.contains("enableShulkerSpawningInEndCities")) enableShulkerSpawningInEndCities = true;
+            if (agentArgs.contains("enableLeashableViallagers")) enableLeashableViallagers = true;
             Matcher matcher = Pattern.compile("maxShulkersCount=(\\d+)").matcher(agentArgs);
             if (matcher.find()) maxShulkersCount = Integer.parseInt(matcher.group(1));
             matcher = Pattern.compile("minShulkersCount=(\\d+)").matcher(agentArgs);
@@ -177,6 +178,15 @@ public final class Main {
                                 }}""".replace("#", obcPrefix), clazz));
                         break;
                     } catch (Throwable e) { throw new RuntimeException(e); }
+                case "net.minecraft.world.entity.npc.EntityVillagerAbstract":
+                    if (!enableLeashableViallagers) return null;
+                    try {
+                        pool.insertClassPath(new LoaderClassPath(loader));
+                        clazz = pool.get(className);
+                        clazz.getMethod("a", buildDesc("Z", "net.minecraft.world.entity.player.EntityHuman"))
+                            .setBody("{ return true; }");
+                        break;
+                    }  catch (Throwable e) { throw new RuntimeException(e); }
                 case "net.minecraft.world.level.chunk.ChunkGenerator":
                     if (!enableShulkerSpawningInEndCities) return null;
                     try {

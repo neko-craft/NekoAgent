@@ -6,6 +6,7 @@
 - Prevent obsidian spikes reset.
 - Allow StoneCutter to hurt player.
 - Allow Shulkers spawn in end cities.
+- Allow player to leash villagers.
 - Add `/mspt <ms>` command to modify tps.
 - Modify server mod name.
 
@@ -29,6 +30,7 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=enableStoneCutterDamage+enableShulker
 - disableObsidianSpikesReset
 - enableStoneCutterDamage
 - enableShulkerSpawningInEndCities
+- enableLeashableViallagers
 - enableSetMSPTCommand
 - maxShulkersCount=4
 - minShulkersCount=1
@@ -36,7 +38,7 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=enableStoneCutterDamage+enableShulker
 ## Build
 
 ```bash
-gradlew jar
+gradlew build
 ```
 
 ## Author
