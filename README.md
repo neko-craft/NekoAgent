@@ -7,6 +7,7 @@
 - Allow StoneCutter to hurt player.
 - Allow Shulkers spawn in end cities.
 - Allow player to leash villagers.
+- Send fake permission level 4 packet to player.
 - Add `/mspt <ms>` command to modify tps.
 - Modify server mod name.
 
@@ -32,6 +33,7 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=enableStoneCutterDamage+enableShulker
 - enableShulkerSpawningInEndCities
 - enableLeashableViallagers
 - enableSetMSPTCommand
+- enableFakeLevel4Permission
 - maxShulkersCount=4
 - minShulkersCount=1
 

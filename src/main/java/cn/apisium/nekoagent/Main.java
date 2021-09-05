@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 
 public final class Main {
     private static boolean enableSandDuplication, disableObsidianSpikesReset, enableStoneCutterDamage,
-            enableShulkerSpawningInEndCities, enableSetMSPTCommand, enableLeashableViallagers;
+            enableShulkerSpawningInEndCities, enableSetMSPTCommand, enableLeashableViallagers,
+            enableFakePermissionLevel4;
     private static String serverName;
     private static int maxShulkersCount = 4, minShulkersCount = 1;
     private final static ClassPool pool = ClassPool.getDefault();
@@ -29,6 +30,7 @@ public final class Main {
             if (agentArgs.contains("enableSetMSPTCommand")) enableSetMSPTCommand = true;
             if (agentArgs.contains("enableShulkerSpawningInEndCities")) enableShulkerSpawningInEndCities = true;
             if (agentArgs.contains("enableLeashableViallagers")) enableLeashableViallagers = true;
+            if (agentArgs.contains("enableFakeLevel4Permission")) enableFakePermissionLevel4 = true;
             Matcher matcher = Pattern.compile("maxShulkersCount=(\\d+)").matcher(agentArgs);
             if (matcher.find()) maxShulkersCount = Integer.parseInt(matcher.group(1));
             matcher = Pattern.compile("minShulkersCount=(\\d+)").matcher(agentArgs);
@@ -89,6 +91,15 @@ public final class Main {
             className = className.replace('/', '.');
             final CtClass clazz;
             switch (className) {
+                case "net.minecraft.network.protocol.game.PacketPlayOutEntityStatus":
+                    if (!enableFakePermissionLevel4) return null;
+                    try {
+                        pool.insertClassPath(new LoaderClassPath(loader));
+                        clazz = pool.get(className);
+                        clazz.getConstructor(buildDesc(null, "net.minecraft.world.entity.Entity", "B"))
+                                .insertBefore("{ if ($2 > 23 && $2 < 28) $2 = 28; }");
+                        break;
+                    } catch (Throwable e) { throw new RuntimeException(e); }
                 case "net.minecraft.world.entity.Entity":
                     if (!enableSandDuplication) return null;
                     try {
