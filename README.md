@@ -33,7 +33,7 @@ java -javaagent:NekoAgent-1.0-SNAPSHOT.jar=enableStoneCutterDamage+enableShulker
 - enableShulkerSpawningInEndCities
 - enableLeashableViallagers
 - enableSetMSPTCommand
-- enableFakeLevel4Permission
+- enableFakePermissionLevel4
 - maxShulkersCount=4
 - minShulkersCount=1
 
